@@ -31,44 +31,74 @@ lengthValues = [
 ];
 
 %% Equilibrium equations
+% Unknown vector:
 % x = [FAx; FAy; FBx; FBy; FCx; FCy; FDx; FDy; FEx; FEy; FFx; FFy; FGx; FGy; Tin]
 
-M = zeros(15,15);
-b = zeros(15,1);
+% Each moving link contributes three scalar equilibrium equations,
+% i.e., sum(Fx) = 0, sum(Fy) = 0, and sum(Mz) = 0.
+% Five moving links therefore produce 15 scalar equilibrium equations.
 
-% Link AB
+M = zeros(15,15); % Coefficient matrix for the 15 unknowns
+b = zeros(15,1); % Right-hand-side vector
+
+%% Link AB
+% Horizontal force equilibrium (FAx + FBx = 0)
 M(1,[1 3]) = [1 1];
+
+% Vertical force equilibrium (FAy + FBy = 0)
 M(2,[2 4]) = [1 1];
-r = B-A;
-M(3,[3 4 15]) = [-r(2) r(1) 1];
 
-% Link BC
+% Moment equilibrium about joint A (Tin - rAB_y*FBx + rAB_x*FBy = 0)
+rAB = B-A;
+M(3,[3 4 15]) = [-rAB(2) rAB(1) 1];
+
+%% Link BC
+% Horizontal force equilibrium (-FBx + FCx = 0)
 M(4,[3 5]) = [-1 1];
+
+% Vertical force equilibrium (-FBy + FCy = 0)
 M(5,[4 6]) = [-1 1];
-r = C-B;
-M(6,[5 6]) = [-r(2) r(1)];
 
-% Link CDE
+% Moment equilibrium about joint B (-rBC_y*FCx + rBC_x*FCy = 0)
+rBC = C-B;
+M(6,[5 6]) = [-rBC(2) rBC(1)];
+
+%% Link CDE
+% Horizontal force equilibrium (-FCx + FDx + FEx = 0)
 M(7,[5 7 9]) = [-1 1 1];
+
+% Vertical force equilibrium (-FCy + FDy + FEy = 0)
 M(8,[6 8 10]) = [-1 1 1];
-rD = D-C;
-rE = E-C;
-M(9,[7 8 9 10]) = [-rD(2) rD(1) -rE(2) rE(1)];
 
-% Link EF
+% Moment equilibrium about joint C (-rCD_y*FDx + rCD_x*FDy - rCE_y*FEx + rCE_x*FEy = 0)
+rCD = D-C;
+rCE = E-C;
+M(9,[7 8 9 10]) = [-rCD(2) rCD(1) -rCE(2) rCE(1)];
+
+%% Link EF
+% Horizontal force equilibrium (-FEx + FFx = 0)
 M(10,[9 11]) = [-1 1];
-M(11,[10 12]) = [-1 1];
-r = F-E;
-M(12,[11 12]) = [-r(2) r(1)];
 
-% Link FG
+% Vertical force equilibrium (-FEy + FFy = 0)
+M(11,[10 12]) = [-1 1];
+
+% Moment equilibrium about joint E (-rEF_y*FFx + rEF_x*FFy = 0)
+rEF = F-E;
+M(12,[11 12]) = [-rEF(2) rEF(1)];
+
+%% Link FG, with artifact force at H
+% Horizontal force equilibrium (-FFx + FGx = 0)
 M(13,[11 13]) = [-1 1];
+
+% Vertical force equilibrium (-FFy + FGy - 100 = 0)
 M(14,[12 14]) = [-1 1];
 b(14) = 100;
-rF = F-G;
-rH = H-G;
-M(15,[11 12]) = [rF(2) -rF(1)];
-b(15) = 100*rH(1);
+
+% Moment equilibrium about joint G (rGF_y*FFx - rGF_x*FFy = 100*rGH_x)
+rGF = F-G;
+rGH = H-G;
+M(15,[11 12]) = [rGF(2) -rGF(1)];
+b(15) = 100*rGH(1);
 
 %% Solve
 x = M\b;
