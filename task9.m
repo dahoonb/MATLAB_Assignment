@@ -64,8 +64,6 @@ F_joint_y(1) = F(2);
 
 lastIdx = 1;
 
-syms x y real
-
 %% Position analysis
 for theta = 1:numberOfSteps
 
@@ -76,40 +74,14 @@ for theta = 1:numberOfSteps
     B_new = [A(1) + AB*cos(currentAngle), A(2) + AB*sin(currentAngle), 0];
 
     %% Compute the new position of C
-    equationC1 = (x - B_new(1))^2 + (y - B_new(2))^2 == BC^2;
-    equationC2 = (x - D(1))^2 + (y - D(2))^2 == CD^2;
+    C_intersections = circleCircleIntersectionEquation(B_new, BC, D, CD);
 
-    solutionC = solve([equationC1, equationC2], [x, y]);
-
-    xSolutionsC = double(solutionC.x);
-    ySolutionsC = double(solutionC.y);
-    xSolutionsC = xSolutionsC(:);
-    ySolutionsC = ySolutionsC(:);
-
-    tolerance = 1e-10;
-
-    realIdxC = abs(imag(xSolutionsC)) < tolerance & abs(imag(ySolutionsC)) < tolerance;
-
-    if ~any(realIdxC)
+    if isempty(C_intersections)
         fprintf(['The new position of joint C cannot be determined at angle %d degrees.\n'], theta);
         break;
     end
 
-    xSolutionsC = real(xSolutionsC(realIdxC));
-    ySolutionsC = real(ySolutionsC(realIdxC));
-
-    C_intersections = [xSolutionsC, ySolutionsC];
-
-    numberOfCPoints = size(C_intersections, 1);
-    C_distances = zeros(numberOfCPoints, 1);
-
-    for i = 1:numberOfCPoints
-        C_distances(i) = sqrt((C_intersections(i,1) - C(1))^2 + (C_intersections(i,2) - C(2))^2);
-    end
-
-    [~, closestCIndex] = min(C_distances);
-
-    C_new = [C_intersections(closestCIndex,1), C_intersections(closestCIndex,2), 0];
+    C_new = chooseClosestIntersection(C_intersections, C);
 
     %% Compute the new position of E
     % C, D, and E are on the same rigid link.
@@ -119,39 +91,15 @@ for theta = 1:numberOfSteps
     E_new = [D(1) + DE*cos(currentDEAngle), D(2) + DE*sin(currentDEAngle), 0];
 
     %% Compute the new position of F
-    equationF1 = (x - E_new(1))^2 + (y - E_new(2))^2 == EF^2;
-    equationF2 = (x - G(1))^2 + (y - G(2))^2 == FG^2;
+    F_intersections = circleCircleIntersectionEquation(E_new, EF, G, FG);
 
-    solutionF = solve([equationF1, equationF2], [x, y]);
-    xSolutionsF = double(solutionF.x);
-    ySolutionsF = double(solutionF.y);
-    xSolutionsF = xSolutionsF(:);
-    ySolutionsF = ySolutionsF(:);
-
-    realIdxF = abs(imag(xSolutionsF)) < tolerance & abs(imag(ySolutionsF)) < tolerance;
-
-    if ~any(realIdxF)
+    if isempty(F_intersections)
         fprintf(['The new position of joint F cannot be ' ...
                  'determined at angle %d degrees.\n'], theta);
         break;
     end
 
-    xSolutionsF = real(xSolutionsF(realIdxF));
-    ySolutionsF = real(ySolutionsF(realIdxF));
-
-    F_intersections = [xSolutionsF, ySolutionsF];
-
-    numberOfFPoints = size(F_intersections, 1);
-    F_distances = zeros(numberOfFPoints, 1);
-
-    for i = 1:numberOfFPoints
-        F_distances(i) = sqrt((F_intersections(i,1) - F(1))^2 + ...
-            (F_intersections(i,2) - F(2))^2);
-    end
-
-    [~, closestFIndex] = min(F_distances);
-
-    F_new = [F_intersections(closestFIndex,1), F_intersections(closestFIndex,2), 0];
+    F_new = chooseClosestIntersection(F_intersections, F);
 
     %% Save new positions
     index = theta + 1;
@@ -222,3 +170,56 @@ axis equal;
 grid on;
 box on;
 hold off;
+
+function intersectionPoints = circleCircleIntersectionEquation(center1, radius1, center2, radius2)
+    intersectionPoints = [];
+
+    syms x y real
+
+    equation1 = (x - center1(1))^2 + (y - center1(2))^2 == radius1^2;
+    equation2 = (x - center2(1))^2 + (y - center2(2))^2 == radius2^2;
+
+    try
+        solution = solve([equation1, equation2], [x, y]);
+
+        xSolutions = double(solution.x);
+        ySolutions = double(solution.y);
+        xSolutions = xSolutions(:);
+        ySolutions = ySolutions(:);
+
+        if isempty(xSolutions) || isempty(ySolutions)
+            return;
+        end
+
+        tolerance = 1e-10;
+        realIdx = abs(imag(xSolutions)) < tolerance & abs(imag(ySolutions)) < tolerance;
+
+        if ~any(realIdx)
+            return;
+        end
+
+        xSolutions = real(xSolutions(realIdx));
+        ySolutions = real(ySolutions(realIdx));
+        intersectionPoints = [xSolutions, ySolutions];
+
+    catch
+        intersectionPoints = [];
+    end
+end
+
+function selectedPoint = chooseClosestIntersection(intersectionPoints, previousPoint)
+    numberOfPoints = size(intersectionPoints, 1);
+    distances = zeros(numberOfPoints, 1);
+
+    for i = 1:numberOfPoints
+        distances(i) = pointDistance(intersectionPoints(i,:), previousPoint);
+    end
+
+    [~, closestIndex] = min(distances);
+
+    selectedPoint = [intersectionPoints(closestIndex,1), intersectionPoints(closestIndex,2), 0];
+end
+
+function distance = pointDistance(point1, point2)
+    distance = sqrt((point1(1) - point2(1))^2 + (point1(2) - point2(2))^2);
+end
